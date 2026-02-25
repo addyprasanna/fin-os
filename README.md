@@ -1,4 +1,5 @@
 # fin-os
+<<<<<<< HEAD
 
 Financial simulation and planning tool.
 
@@ -69,3 +70,8 @@ config = build_scenario(
 records = simulate(config, config["simulation"]["start_date"], 120, stop_mode="goal")
 ```
 what if you knew everything about your money?
+=======
+what if i knew where my money was going before i even spent it?
+
+this project builds on my own experiences with debt consolidation, credit cardmaxxing and my own interest in building net worth fast while still maximizing my lifestyle.
+>>>>>>> 5fa27ddb8eabc10d4b95d413ebd539627217fb82
