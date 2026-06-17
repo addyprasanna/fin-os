@@ -50,6 +50,36 @@ The web interface provides:
 
 Press `Ctrl+C` to stop the web server.
 
+### 🤖 Agentic advisor (chat)
+
+Talk to a financial advisor that **drives the simulation engine for you**. Claude has the
+engine wired up as tools — it runs and re-runs simulations, tries what-ifs, compares
+strategies, and can set up or edit your scenario from a plain-English description. Every
+number it gives you is grounded in an actual simulation, not guessed.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...   # or: ant auth login
+python finos/run.py --agent
+```
+
+Then open `http://localhost:3000` and ask things like:
+
+- *"When am I debt-free at my current pace?"*
+- *"If I invest $500/mo, what's my net worth in 5 years?"*
+- *"What's the fastest way to be debt-free?"* (it compares strategies and ranks them)
+- *"I make $5,600/mo, rent is $850, and I have $5,800 on a card at 22% APR…"* (it builds your scenario)
+
+The right-hand panel shows a live net-worth/debt chart that updates each time the agent
+runs a simulation, plus your current scenario.
+
+The agent uses Claude (`claude-opus-4-8`) via the official `anthropic` SDK. It runs locally;
+your scenario and conversation never leave your machine except as prompts to the Claude API.
+
+**Capabilities** (agent tools, in `finos/agent.py`):
+- `run_simulation` — run/re-run with what-if overrides (investing, emergency floor, expenses, goal)
+- `compare_strategies` — sweep several strategies in one shot and rank them
+- `update_scenario` — create or edit your accounts, debts, income, and expenses from natural language
+
 ### Building a scenario in code
 
 Use `build_scenario()` to build an engine-compatible config from user inputs (e.g. from your own UI or API):

@@ -74,14 +74,21 @@ def build_scenario(
             rate_schedule = rs
         else:
             rate_schedule = float(rate) if rate not in (None, "") else 0.0
-        acc_type = (a.get("type") or "cash").strip().lower() or "cash"
+        acc_type = (a.get("type") or a.get("kind") or "cash").strip().lower() or "cash"
         if acc_type not in ("cash", "invest"):
             acc_type = "cash"
+        kind = "investment" if acc_type == "invest" else "cash"
+        ar = a.get("annual_return")
+        annual_return = float(ar) if ar is not None else (float(rate_schedule) if isinstance(rate_schedule, (int, float)) else 0.0)
+        monthly_target = float(a.get("monthly_target") or 0)
         out_accounts.append({
             "name": name,
             "balance": balance,
+            "kind": kind,
+            "annual_return": annual_return,
             "rate_schedule": rate_schedule,
             "type": acc_type,
+            "monthly_target": monthly_target,
         })
 
     # Normalize debts
@@ -153,17 +160,21 @@ def build_scenario(
     needs_investing_account = investing_val > 0 or investing_pct > 0
     investing_account_name = None
     if needs_investing_account:
-        # Use first existing investment account, or create "Investments"
         invest_accounts = [a for a in out_accounts if a.get("type") == "invest"]
         if invest_accounts:
             investing_account_name = invest_accounts[0]["name"]
+            # Set monthly_target from fixed investing or approximate from pct (use 0 if pct-only; UI can set)
+            invest_accounts[0]["monthly_target"] = investing_val or invest_accounts[0].get("monthly_target", 0)
         else:
             investing_account_name = "Investments"
             out_accounts.append({
                 "name": investing_account_name,
                 "balance": 0.0,
+                "kind": "investment",
+                "annual_return": 0.0,
                 "rate_schedule": 0.0,
                 "type": "invest",
+                "monthly_target": investing_val,
             })
 
     goal = None
@@ -187,7 +198,9 @@ def build_scenario(
         "simulation": {
             "start_date": start,
             "months": int(months) if months is not None else 120,
+            "cash_landing_account": cash or (out_accounts[0]["name"] if out_accounts else "HYSA"),
             "cash_account": cash or (out_accounts[0]["name"] if out_accounts else "HYSA"),
+            "emergency_floor": float(0),
             "goal_net_worth": goal,
             "monthly_investing": investing_val,
             "monthly_investing_pct": investing_pct,

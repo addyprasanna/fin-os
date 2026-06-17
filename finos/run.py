@@ -6,7 +6,7 @@ Loads config, runs the simulator, and prints results.
 import argparse
 from config import CONFIG
 from engine import simulate
-from web_view import serve_results, serve_interactive_app
+from web_view import serve_results, serve_interactive_app, serve_agent_app
 
 
 def main():
@@ -59,9 +59,18 @@ Examples:
         action="store_true",
         help="Start interactive web app: enter scenario in browser, then run until goal / debt paid / fixed"
     )
-    
+    parser.add_argument(
+        "--agent",
+        action="store_true",
+        help="Start the agentic chat advisor (Claude drives the simulation engine). Needs ANTHROPIC_API_KEY."
+    )
+
     args = parser.parse_args()
-    
+
+    if args.agent:
+        serve_agent_app(port=args.port, config=CONFIG)
+        return
+
     if args.web_app:
         serve_interactive_app(port=args.port)
         return
@@ -227,6 +236,16 @@ Examples:
     
     # Serve web view if requested
     if args.web:
+        total_contributions = sum(sum(r.get("contributions", {}).values()) for r in records)
+        contributions_by_account = {}
+        payments_by_debt = {}
+        for r in records:
+            for acc, amt in r.get("contributions", {}).items():
+                contributions_by_account[acc] = contributions_by_account.get(acc, 0) + amt
+            for debt, amt in r.get("payments", {}).items():
+                payments_by_debt[debt] = payments_by_debt.get(debt, 0) + amt
+        for r in records:
+            r["total_contributions"] = sum(r.get("contributions", {}).values())
         simulation_data = {
             'records': records,
             'start_date': start_date,
@@ -240,10 +259,14 @@ Examples:
             'total_income': total_income,
             'total_expenses': total_expenses,
             'total_paid': total_paid,
+            'total_contributions': total_contributions,
+            'contributions_by_account': contributions_by_account,
+            'payments_by_debt': payments_by_debt,
             'avg_savings_rate': avg_savings_rate,
             'debt_paid_off_month': debt_paid_off_month.strftime('%Y-%m') if debt_paid_off_month else None,
             'goal_reached': goal_reached,
             'show_table': args.show_table,
+            'account_types': {a["name"]: (a.get("kind") or a.get("type") or "cash") for a in CONFIG.get("instruments", {}).get("accounts", [])},
         }
         serve_results(simulation_data, port=args.port)
 
