@@ -72,6 +72,19 @@ Then open `http://localhost:3000` and ask things like:
 The right-hand panel shows a live net-worth/debt chart that updates each time the agent
 runs a simulation, plus your current scenario.
 
+**It's a persistent, multi-scenario platform.** Your plans and conversations are saved to a
+local SQLite database (`~/.fin-os/finos.db`, override with `FINOS_DB`), so they survive
+restarts. Use the left sidebar to keep multiple named plans — *"Current path"*, *"If I move
+to NYC"*, *"Aggressive payoff"* — each with its own numbers and chat. Creating a plan forks
+the active one's numbers so you can tweak and compare. Switch, rename, and delete from the
+sidebar; the agent edits whichever plan is active.
+
+**Compare two plans side by side.** The ⇄ button (top of the insights panel) opens a compare view:
+pick any two plans and see their net-worth curves overlaid, a metric table with deltas (final net
+worth, debt-free date, total invested, savings rate, interest paid), and a precise diff of exactly
+what's different between the two scenarios. Both plans are simulated over the same fixed horizon so
+the curves line up.
+
 The agent uses Claude (`claude-opus-4-8`) via the official `anthropic` SDK. It runs locally;
 your scenario and conversation never leave your machine except as prompts to the Claude API.
 

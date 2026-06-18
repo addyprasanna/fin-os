@@ -1076,7 +1076,7 @@ AGENT_HTML_TEMPLATE = """
             --ink: #0e1a14; --muted: #6b7770; --line: #e7e9e6; --line-soft: #eef1ee;
             --canvas: #f4f5f2; --card: #ffffff;
             --accent: #0f9d6b; --accent-deep: #0b7a52; --accent-wash: #e8f6ef;
-            --debt: #e0573e; --user-bub: #11261d;
+            --debt: #e0573e; --user-bub: #11261d; --bcol: #6d5ef0;
             --shadow: 0 1px 2px rgba(16,32,24,.04), 0 8px 28px rgba(16,32,24,.06);
             --num: 'Space Grotesk', -apple-system, sans-serif;
             --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -1085,10 +1085,29 @@ AGENT_HTML_TEMPLATE = """
         html, body { height: 100%; }
         body { font-family: var(--sans); background: var(--canvas); color: var(--ink);
                -webkit-font-smoothing: antialiased; height: 100vh; overflow: hidden; }
-        .shell { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.85fr);
-                 gap: 16px; height: 100vh; padding: 16px; max-width: 1500px; margin: 0 auto; }
+        .shell { display: grid; grid-template-columns: 232px minmax(0, 1fr) minmax(340px, 0.8fr);
+                 gap: 16px; height: 100vh; padding: 16px; max-width: 1640px; margin: 0 auto; }
         .panel { background: var(--card); border: 1px solid var(--line); border-radius: 20px;
                  box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+
+        /* Sidebar: scenarios */
+        .plan-list { overflow-y: auto; flex: 1; padding: 10px; display: flex; flex-direction: column; gap: 3px; }
+        .plan { display: flex; align-items: center; gap: 9px; padding: 10px 11px; border-radius: 11px; cursor: pointer; transition: .12s; }
+        .plan:hover { background: var(--canvas); }
+        .plan.active { background: var(--accent-wash); }
+        .plan .pdot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; opacity: 0; transition: .12s; }
+        .plan.active .pdot { opacity: 1; }
+        .plan .name { flex: 1; font-size: .88rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .plan.active .name { color: var(--accent-deep); font-weight: 600; }
+        .plan .acts { display: none; gap: 1px; flex-shrink: 0; }
+        .plan:hover .acts { display: flex; }
+        .plan .acts button { background: none; border: none; cursor: pointer; color: var(--muted); padding: 3px; border-radius: 6px; display: grid; place-items: center; }
+        .plan .acts button:hover { background: #fff; color: var(--ink); }
+        .plan .acts svg { width: 14px; height: 14px; }
+        .new-plan { margin: 0 10px 10px; padding: 9px; border: 1px dashed var(--line); border-radius: 11px; background: transparent;
+                    color: var(--muted); font: inherit; font-size: .84rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: .12s; }
+        .new-plan:hover { border-color: var(--accent); color: var(--accent-deep); background: var(--accent-wash); }
+        .new-plan svg { width: 15px; height: 15px; }
 
         /* Brand / headers */
         .bar { padding: 16px 22px; display: flex; align-items: center; justify-content: space-between;
@@ -1167,20 +1186,71 @@ AGENT_HTML_TEMPLATE = """
         .scenario pre { font-size: .76rem; line-height: 1.6; color: #4a544e; white-space: pre-wrap;
                         font-family: var(--num); background: var(--canvas); border: 1px solid var(--line-soft); border-radius: 12px; padding: 14px; }
 
-        @media (max-width: 860px) {
+        @media (max-width: 980px) {
             body { overflow: auto; }
             .shell { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
-            .panel { min-height: 70vh; } .panel.right { min-height: auto; }
+            .panel { min-height: 70vh; } .panel.right, .panel.sidebar { min-height: auto; }
+            .plan-list { flex-direction: row; flex-wrap: wrap; }
+            .plan { background: var(--canvas); } .plan .acts { display: flex; }
         }
+
+        /* Compare modal */
+        .modal-bg { position: fixed; inset: 0; background: rgba(14,26,20,.45); display: none;
+                    align-items: center; justify-content: center; z-index: 50; padding: 22px; }
+        .modal-bg.open { display: flex; animation: rise .2s ease; }
+        .modal { background: #fff; border-radius: 22px; width: min(940px, 96vw); max-height: 92vh; overflow-y: auto;
+                 box-shadow: 0 28px 80px rgba(0,0,0,.32); }
+        .mhead { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px;
+                 border-bottom: 1px solid var(--line-soft); position: sticky; top: 0; background: #fff; z-index: 1; }
+        .mhead h2 { font-family: var(--num); font-size: 1.12rem; letter-spacing: -.01em; }
+        .mbody { padding: 22px 24px 26px; }
+        .cmp-pick { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+        .cmp-pick select { font: inherit; font-size: .9rem; padding: 9px 12px; border: 1px solid var(--line);
+                           border-radius: 11px; background: var(--canvas); color: var(--ink); max-width: 240px; }
+        .cmp-pick #cmp-a { border-left: 3px solid var(--accent); }
+        .cmp-pick #cmp-b { border-left: 3px solid var(--bcol); }
+        .cmp-pick .vs { font-family: var(--num); color: var(--muted); font-weight: 600; }
+        .cmp-pick button { background: var(--accent); color: #fff; border: none; border-radius: 11px; padding: 9px 18px;
+                           font: inherit; font-weight: 600; cursor: pointer; }
+        .cmp-pick button:hover { background: var(--accent-deep); }
+        .cmp-table { width: 100%; border-collapse: collapse; margin: 18px 0 6px; font-size: .9rem; }
+        .cmp-table th, .cmp-table td { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); text-align: right; }
+        .cmp-table th { font-family: var(--num); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+        .cmp-table th:first-child, .cmp-table td:first-child { text-align: left; }
+        .cmp-table td.metric { color: var(--muted); }
+        .cmp-table td.num { font-family: var(--num); font-weight: 600; }
+        .cmp-table .ca { color: var(--accent-deep); } .cmp-table .cb { color: var(--bcol); }
+        .delta-pos { color: var(--accent-deep); } .delta-neg { color: var(--debt); } .delta-zero { color: var(--muted); }
+        .diff-sec { font-family: var(--num); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+                    color: var(--muted); margin: 18px 0 4px; }
+        .diff-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 12px; padding: 7px 0;
+                    border-bottom: 1px dashed var(--line-soft); font-size: .86rem; align-items: baseline; }
+        .diff-row .dl { color: var(--ink); } .diff-row .da { color: var(--accent-deep); font-family: var(--num); }
+        .diff-row .db { color: var(--bcol); font-family: var(--num); }
+        .cmp-empty { color: var(--muted); font-size: .88rem; text-align: center; padding: 22px; }
+        .cmp-chart { margin-top: 6px; }
     </style>
 </head>
 <body>
     <div class="shell">
-        <div class="panel">
+        <aside class="panel sidebar">
             <div class="bar">
                 <div class="brand">
                     <div class="logo">f</div>
-                    <div><span class="t">fin·os</span><span class="s">agentic advisor</span></div>
+                    <div><span class="t">fin·os</span><span class="s">plans</span></div>
+                </div>
+            </div>
+            <div class="plan-list" id="plan-list"></div>
+            <button class="new-plan" onclick="newScenario()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                New plan
+            </button>
+        </aside>
+        <div class="panel">
+            <div class="bar">
+                <div class="brand">
+                    <div class="logo" style="font-size:13px" id="active-badge">·</div>
+                    <div><span class="t" id="active-name">advisor</span><span class="s">agentic budgeting</span></div>
                 </div>
                 <button class="icon-btn" onclick="resetChat()" title="New conversation" aria-label="Reset">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
@@ -1208,7 +1278,12 @@ AGENT_HTML_TEMPLATE = """
         <div class="panel right">
             <div class="bar">
                 <h2>Latest simulation</h2>
-                <span class="badge" id="sim-meta">awaiting a run</span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="badge" id="sim-meta">awaiting a run</span>
+                    <button class="icon-btn" onclick="openCompare()" title="Compare two plans" aria-label="Compare">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/></svg>
+                    </button>
+                </div>
             </div>
             <div class="insights-body">
                 <div class="stats" id="stats">
@@ -1225,6 +1300,26 @@ AGENT_HTML_TEMPLATE = """
                     <h3>Current scenario</h3>
                     <pre id="scenario">loading…</pre>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="compare-modal" onclick="if(event.target===this)closeCompare()">
+        <div class="modal">
+            <div class="mhead">
+                <h2>Compare plans</h2>
+                <button class="icon-btn" onclick="closeCompare()" aria-label="Close">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="mbody">
+                <div class="cmp-pick">
+                    <select id="cmp-a"></select>
+                    <span class="vs">vs</span>
+                    <select id="cmp-b"></select>
+                    <button onclick="runCompare()">Compare</button>
+                </div>
+                <div id="cmp-results"></div>
             </div>
         </div>
     </div>
@@ -1349,21 +1444,196 @@ AGENT_HTML_TEMPLATE = """
         function fmtMoney(x) { return (x < 0 ? '-$' : '$') + Math.abs(x).toLocaleString(undefined, { maximumFractionDigits: 0 }); }
         function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+        let activeId = null;
+        const EDIT_SVG = '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 20h9\"/><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z\"/></svg>';
+        const DEL_SVG = '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\"/></svg>';
+
         async function loadScenario() {
             try { const r = await fetch('/api/scenario'); const j = await r.json();
                   document.getElementById('scenario').textContent = j.text; } catch (e) {}
         }
-        async function resetChat() {
-            await fetch('/api/reset', { method: 'POST' });
-            chatEl().innerHTML = '<div class="msg assistant">Fresh start. What would you like to figure out?</div>';
+
+        async function loadPlans() {
+            const r = await fetch('/api/scenarios'); const j = await r.json();
+            activeId = j.active_id;
+            const list = document.getElementById('plan-list'); list.innerHTML = '';
+            j.scenarios.forEach(s => {
+                const el = document.createElement('div');
+                el.className = 'plan' + (s.id === activeId ? ' active' : '');
+                el.innerHTML = '<span class="pdot"></span><span class="name"></span>' +
+                    '<span class="acts"><button class="b-ren" title="Rename">' + EDIT_SVG + '</button>' +
+                    '<button class="b-del" title="Delete">' + DEL_SVG + '</button></span>';
+                el.querySelector('.name').textContent = s.name;
+                el.onclick = (e) => { if (e.target.closest('.acts')) return; switchPlan(s.id); };
+                el.querySelector('.b-ren').onclick = (e) => { e.stopPropagation(); renamePlan(s.id, s.name); };
+                el.querySelector('.b-del').onclick = (e) => { e.stopPropagation(); deletePlan(s.id, j.scenarios.length); };
+                list.appendChild(el);
+                if (s.id === activeId) {
+                    document.getElementById('active-name').textContent = s.name;
+                    document.getElementById('active-badge').textContent = (s.name[0] || '·').toUpperCase();
+                }
+            });
+        }
+
+        async function switchPlan(id) {
+            const r = await fetch('/api/scenarios/' + id + '/activate', { method: 'POST' });
+            const j = await r.json();
+            activeId = j.active_id;
+            document.getElementById('scenario').textContent = j.scenario;
+            renderMessages(j.messages);
+            resetInsights();
+            loadPlans();
+        }
+
+        async function newScenario() {
+            const name = prompt('Name this plan (it starts as a copy of the current one):', 'New plan');
+            if (name === null) return;
+            const r = await fetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim() || 'New plan' }) });
+            const j = await r.json();
+            await switchPlan(j.id);
+        }
+
+        async function renamePlan(id, current) {
+            const name = prompt('Rename plan:', current);
+            if (!name || !name.trim()) return;
+            await fetch('/api/scenarios/' + id + '/rename', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim() }) });
+            loadPlans();
+        }
+
+        async function deletePlan(id, total) {
+            if (!confirm('Delete this plan and its chat history? This cannot be undone.')) return;
+            const r = await fetch('/api/scenarios/' + id, { method: 'DELETE' });
+            const j = await r.json();
+            if (id === activeId) { await switchPlan(j.active_id); }
+            else { loadPlans(); }
+        }
+
+        function renderMessages(msgs) {
+            const c = chatEl(); c.innerHTML = '';
+            if (!msgs || !msgs.length) {
+                addMsg('assistant', "This plan's chat is empty. Ask me a what-if, a payoff timeline, or how to hit a goal — or describe a change to the numbers.");
+                return;
+            }
+            msgs.forEach(m => m.role === 'user' ? addMsg('user', escapeHtml(m.text)) : addMsg('assistant', marked.parse(m.text)));
+        }
+
+        function resetInsights() {
             if (chart) { chart.destroy(); chart = null; }
             document.getElementById('chart').style.display = 'none';
             document.getElementById('chart-empty').style.display = 'block';
             ['st-nw','st-debt','st-inv','st-save'].forEach(id => document.getElementById(id).textContent = '—');
             document.getElementById('sim-meta').textContent = 'awaiting a run';
-            loadScenario();
         }
-        loadScenario();
+
+        async function resetChat() {
+            await fetch('/api/reset', { method: 'POST' });
+            chatEl().innerHTML = '';
+            addMsg('assistant', 'Fresh start for this plan. What would you like to figure out?');
+            resetInsights();
+        }
+
+        // ---- Compare two plans ----
+        let cmpChart = null;
+
+        async function openCompare() {
+            const j = await (await fetch('/api/scenarios')).json();
+            const a = document.getElementById('cmp-a'), b = document.getElementById('cmp-b');
+            a.innerHTML = ''; b.innerHTML = '';
+            j.scenarios.forEach(s => { a.add(new Option(s.name, s.id)); b.add(new Option(s.name, s.id)); });
+            a.value = j.active_id;
+            const other = j.scenarios.find(s => s.id !== j.active_id);
+            b.value = other ? other.id : j.active_id;
+            document.getElementById('cmp-results').innerHTML = j.scenarios.length < 2
+                ? '<div class="cmp-empty">Create a second plan to compare — new plans start as a copy of the current one.</div>' : '';
+            document.getElementById('compare-modal').classList.add('open');
+            if (j.scenarios.length >= 2) runCompare();
+        }
+
+        function closeCompare() {
+            document.getElementById('compare-modal').classList.remove('open');
+            if (cmpChart) { cmpChart.destroy(); cmpChart = null; }
+        }
+
+        async function runCompare() {
+            const a = document.getElementById('cmp-a').value, b = document.getElementById('cmp-b').value;
+            const res = document.getElementById('cmp-results');
+            res.innerHTML = '<div class="cmp-empty">Running both simulations…</div>';
+            const r = await fetch('/api/compare?a=' + a + '&b=' + b);
+            if (!r.ok) { res.innerHTML = '<div class="cmp-empty">Could not compare those plans.</div>'; return; }
+            const d = await r.json();
+            res.innerHTML = '<canvas id="cmp-canvas" class="cmp-chart" height="170"></canvas>' + buildStats(d) + buildDiff(d);
+            drawCmpChart(d);
+        }
+
+        function buildStats(d) {
+            const A = d.a.summary, B = d.b.summary;
+            const metrics = [
+                { k: 'Final net worth', va: A.final_net_worth, vb: B.final_net_worth, fmt: fmtMoney, better: 'high' },
+                { k: 'Total invested', va: A.total_invested, vb: B.total_invested, fmt: fmtMoney, better: 'high' },
+                { k: 'Avg savings rate', va: A.avg_savings_rate, vb: B.avg_savings_rate, fmt: (x) => (x*100).toFixed(0)+'%', better: 'high', pp: true },
+                { k: 'Total interest paid', va: A.total_debt_interest_paid, vb: B.total_debt_interest_paid, fmt: fmtMoney, better: 'low' },
+            ];
+            let rows = metrics.map(m => {
+                const delta = m.vb - m.va;
+                const fav = m.better === 'high' ? delta > 0 : delta < 0;
+                const cls = Math.abs(delta) < 1e-9 ? 'delta-zero' : (fav ? 'delta-pos' : 'delta-neg');
+                const dtext = m.pp ? ((delta >= 0 ? '+' : '') + (delta*100).toFixed(0) + ' pp')
+                                   : ((delta >= 0 ? '+' : '-') + fmtMoney(Math.abs(delta)).replace('-',''));
+                return '<tr><td class="metric">' + m.k + '</td><td class="num ca">' + m.fmt(m.va) +
+                       '</td><td class="num cb">' + m.fmt(m.vb) + '</td><td class="num ' + cls + '">' + (Math.abs(delta) < 1e-9 ? '—' : dtext) + '</td></tr>';
+            }).join('');
+            rows += '<tr><td class="metric">Debt-free</td><td class="num ca">' + (A.debt_paid_off_month || '—') +
+                    '</td><td class="num cb">' + (B.debt_paid_off_month || '—') + '</td><td class="num delta-zero">—</td></tr>';
+            return '<table class="cmp-table"><thead><tr><th>Metric</th><th class="ca">' + escapeHtml(d.a.name) +
+                   '</th><th class="cb">' + escapeHtml(d.b.name) + '</th><th>Δ (B−A)</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        }
+
+        function buildDiff(d) {
+            if (!d.diff || !d.diff.length) return '<div class="cmp-empty">These two plans have identical inputs.</div>';
+            const secs = {};
+            d.diff.forEach(row => { (secs[row.section] = secs[row.section] || []).push(row); });
+            let html = '<div class="diff-row" style="border-bottom:1px solid var(--line);margin-top:10px"><span class="dl" style="color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">What changed</span>' +
+                       '<span class="da" style="font-size:.72rem">' + escapeHtml(d.a.name) + '</span><span class="db" style="font-size:.72rem">' + escapeHtml(d.b.name) + '</span></div>';
+            Object.keys(secs).forEach(sec => {
+                html += '<div class="diff-sec">' + sec + '</div>';
+                secs[sec].forEach(row => {
+                    html += '<div class="diff-row"><span class="dl">' + escapeHtml(row.label) + '</span><span class="da">' +
+                            escapeHtml(String(row.a)) + '</span><span class="db">' + escapeHtml(String(row.b)) + '</span></div>';
+                });
+            });
+            return html;
+        }
+
+        function drawCmpChart(d) {
+            const labels = d.a.chart.labels.length >= d.b.chart.labels.length ? d.a.chart.labels : d.b.chart.labels;
+            const datasets = [
+                { label: d.a.name, data: d.a.chart.net_worth, borderColor: '#0f9d6b', backgroundColor: 'transparent', borderWidth: 2.5, tension: .3, pointRadius: 0 },
+                { label: d.b.name, data: d.b.chart.net_worth, borderColor: '#6d5ef0', backgroundColor: 'transparent', borderWidth: 2.5, tension: .3, pointRadius: 0 },
+            ];
+            const cfg = { type: 'line', data: { labels, datasets },
+                options: { responsive: true, interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { labels: { boxWidth: 10, usePointStyle: true, pointStyle: 'circle', font: { family: 'Space Grotesk', size: 11 }, color: '#4a544e' } },
+                        tooltip: { backgroundColor: '#0e1a14', padding: 10, cornerRadius: 8, titleFont: { family: 'Space Grotesk' }, bodyFont: { family: 'Space Grotesk' },
+                                   callbacks: { label: (c) => c.dataset.label + ': ' + fmtMoney(c.parsed.y) } } },
+                    scales: { y: { grid: { color: '#eef1ee' }, ticks: { callback: (v) => '$' + (v/1000).toFixed(0) + 'k', font: { family: 'Space Grotesk', size: 10 }, color: '#9aa6a0' } },
+                              x: { grid: { display: false }, ticks: { maxTicksLimit: 7, font: { family: 'Space Grotesk', size: 10 }, color: '#9aa6a0' } } } } };
+            if (cmpChart) cmpChart.destroy();
+            cmpChart = new Chart(document.getElementById('cmp-canvas'), cfg);
+        }
+
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCompare(); });
+
+        async function init() {
+            await loadPlans();
+            await loadScenario();
+            try {
+                const r = await fetch('/api/messages'); const j = await r.json();
+                if (j.messages && j.messages.length) renderMessages(j.messages);
+            } catch (e) {}
+        }
+        init();
     </script>
 </body>
 </html>
@@ -1371,24 +1641,105 @@ AGENT_HTML_TEMPLATE = """
 
 
 def create_agent_app(config=None):
-    """Flask app: chat with the agent, which drives the engine as tools."""
+    """Flask app: a multi-scenario, persistent agentic budgeting platform.
+
+    Scenarios and chat history live in a SQLite store (survives restarts). One
+    scenario is "active" at a time; the agent session is bound to it.
+    """
     from agent import AgentSession, scenario_text
+    from store import Store
+    from config import CONFIG as DEFAULT_CONFIG
 
     app = Flask(__name__)
-    app.config["session"] = AgentSession(config)
+    store = Store()
+    app.config["store"] = store
+    seed_config = config or DEFAULT_CONFIG
+
+    if store.count_scenarios() == 0:
+        store.create_scenario("My plan", seed_config)
+    app.config["active_id"] = store.list_scenarios()[0]["id"]
+    app.config["session"] = AgentSession(store=store, scenario_id=app.config["active_id"])
+
+    def bind(scenario_id):
+        app.config["active_id"] = scenario_id
+        app.config["session"] = AgentSession(store=store, scenario_id=scenario_id)
+        return app.config["session"]
 
     @app.route("/")
     def index():
         return render_template_string(AGENT_HTML_TEMPLATE)
 
+    @app.route("/api/scenarios")
+    def scenarios():
+        return jsonify({"scenarios": store.list_scenarios(), "active_id": app.config["active_id"]})
+
+    @app.route("/api/scenarios", methods=["POST"])
+    def create_scenario():
+        body = request.get_json(silent=True) or {}
+        name = (body.get("name") or "Untitled plan").strip() or "Untitled plan"
+        # New scenarios fork the active one's numbers by default (handy for "what if…").
+        if body.get("blank"):
+            base = seed_config
+        else:
+            active = store.get_scenario(app.config["active_id"])
+            base = active["config"] if active else seed_config
+        new_id = store.create_scenario(name, base)
+        bind(new_id)
+        return jsonify({"id": new_id, "active_id": new_id})
+
+    @app.route("/api/scenarios/<int:scenario_id>/activate", methods=["POST"])
+    def activate(scenario_id):
+        if store.get_scenario(scenario_id) is None:
+            return jsonify({"error": "not found"}), 404
+        session = bind(scenario_id)
+        return jsonify({
+            "active_id": scenario_id,
+            "scenario": scenario_text(session.config),
+            "messages": store.get_messages(scenario_id),
+        })
+
+    @app.route("/api/scenarios/<int:scenario_id>/rename", methods=["POST"])
+    def rename(scenario_id):
+        name = ((request.get_json(silent=True) or {}).get("name") or "").strip()
+        if not name:
+            return jsonify({"error": "name required"}), 400
+        store.rename_scenario(scenario_id, name)
+        return jsonify({"ok": True})
+
+    @app.route("/api/scenarios/<int:scenario_id>", methods=["DELETE"])
+    def delete(scenario_id):
+        store.delete_scenario(scenario_id)
+        if store.count_scenarios() == 0:
+            store.create_scenario("My plan", seed_config)
+        if app.config["active_id"] == scenario_id:
+            bind(store.list_scenarios()[0]["id"])
+        return jsonify({"active_id": app.config["active_id"]})
+
     @app.route("/api/scenario")
     def scenario():
-        session = app.config["session"]
-        return jsonify({"text": scenario_text(session.config)})
+        return jsonify({"text": scenario_text(app.config["session"].config),
+                        "active_id": app.config["active_id"]})
+
+    @app.route("/api/messages")
+    def messages():
+        return jsonify({"messages": store.get_messages(app.config["active_id"])})
+
+    @app.route("/api/compare")
+    def compare_plans():
+        from compare import compare as run_compare
+        a = request.args.get("a", type=int)
+        b = request.args.get("b", type=int)
+        sa, sb = store.get_scenario(a), store.get_scenario(b)
+        if sa is None or sb is None:
+            return jsonify({"error": "scenario not found"}), 404
+        result = run_compare(sa["config"], sb["config"])
+        result["a"]["name"] = sa["name"]
+        result["b"]["name"] = sb["name"]
+        return jsonify(result)
 
     @app.route("/api/reset", methods=["POST"])
     def reset():
-        app.config["session"].reset(config)
+        app.config["session"].clear_conversation()
         return jsonify({"ok": True})
 
     @app.route("/api/chat", methods=["POST"])

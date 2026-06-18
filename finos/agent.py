@@ -539,16 +539,47 @@ def build_system_prompt(config):
 class AgentSession:
     """Holds the working scenario and conversation history for one chat session."""
 
-    def __init__(self, config=None):
-        self.config = copy.deepcopy(config or CONFIG)
-        self.messages = []
+    def __init__(self, config=None, store=None, scenario_id=None):
+        self.store = store
+        self.scenario_id = scenario_id
         self._client = None
+        if store is not None and scenario_id is not None:
+            sc = store.get_scenario(scenario_id)
+            self.config = copy.deepcopy(sc["config"]) if sc else copy.deepcopy(config or CONFIG)
+            self.messages = self._rehydrate(store.get_messages(scenario_id))
+        else:
+            self.config = copy.deepcopy(config or CONFIG)
+            self.messages = []
 
     @property
     def client(self):
         if self._client is None:
             self._client = anthropic.Anthropic()
         return self._client
+
+    @staticmethod
+    def _rehydrate(stored):
+        """Rebuild a working message list from persisted display turns (text only).
+
+        Cross-session continuity uses plain text turns — robust to restarts and
+        avoids replaying model-internal blocks (thinking/tool_use) from a prior run.
+        """
+        msgs = []
+        for m in stored or []:
+            role, text = m.get("role"), (m.get("text") or "")
+            if role in ("user", "assistant") and text.strip():
+                msgs.append({"role": role, "content": text})
+        return msgs
+
+    def _persist_config(self):
+        if self.store is not None and self.scenario_id is not None:
+            self.store.save_config(self.scenario_id, self.config)
+
+    def clear_conversation(self):
+        """Clear the chat for this scenario (keeps the scenario + its config)."""
+        self.messages = []
+        if self.store is not None and self.scenario_id is not None:
+            self.store.clear_messages(self.scenario_id)
 
     def reset(self, config=None):
         self.config = copy.deepcopy(config or CONFIG)
@@ -582,6 +613,7 @@ class AgentSession:
           {"type": "done"} | {"type": "error", "message": ...}
         """
         self.messages.append({"role": "user", "content": user_message})
+        assistant_text = []
         try:
             try:
                 client = self.client
@@ -594,11 +626,16 @@ class AgentSession:
                     "(or run `ant auth login`) and restart the server."
                 )}
                 return
+
+            if self.store is not None and self.scenario_id is not None:
+                self.store.add_message(self.scenario_id, "user", user_message)
+
             while True:
                 system = build_system_prompt(self.config)
                 with self._open_stream(system) as stream:
                     for event in stream:
                         if event.type == "content_block_delta" and event.delta.type == "text_delta":
+                            assistant_text.append(event.delta.text)
                             yield {"type": "text", "text": event.delta.text}
                     final = stream.get_final_message()
 
@@ -616,6 +653,7 @@ class AgentSession:
                     if chart is not None:
                         yield {"type": "simulation", "data": chart}
                     if block.name == "update_scenario" and isinstance(result, dict) and result.get("ok"):
+                        self._persist_config()
                         yield {"type": "scenario", "text": result.get("scenario", "")}
                     tool_results.append({
                         "type": "tool_result",
@@ -624,6 +662,9 @@ class AgentSession:
                     })
                 self.messages.append({"role": "user", "content": tool_results})
 
+            final_text = "".join(assistant_text).strip()
+            if final_text and self.store is not None and self.scenario_id is not None:
+                self.store.add_message(self.scenario_id, "assistant", final_text)
             yield {"type": "done"}
         except anthropic.AuthenticationError:
             yield {"type": "error", "message": "Authentication failed. Set ANTHROPIC_API_KEY in your environment."}
