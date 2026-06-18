@@ -533,6 +533,132 @@ def build_system_prompt(config):
 
 
 # ---------------------------------------------------------------------------
+# Editable form shape <-> engine config (for the direct scenario editor UI)
+# ---------------------------------------------------------------------------
+
+def config_to_form(config):
+    """Project an engine config into a flat, editable shape for the UI."""
+    sim = config.get("simulation", {})
+    start = sim.get("start_date") or date.today()
+    instruments = config.get("instruments", {})
+    streams = config.get("cashflow_streams", {})
+
+    accounts = []
+    for a in instruments.get("accounts", []):
+        ar = a.get("annual_return")
+        if ar is None:
+            ar = _annual_rate(a.get("rate_schedule", 0), start)
+        accounts.append({
+            "name": a.get("name", ""),
+            "balance": float(a.get("balance", 0) or 0),
+            "rate": float(ar or 0),
+            "type": "invest" if _is_investment(a) else "cash",
+            "monthly_target": float(a.get("monthly_target", 0) or 0),
+        })
+
+    debts = []
+    for d in instruments.get("debts", []):
+        rule = d.get("min_payment_rule") or {}
+        debts.append({
+            "name": d.get("name", ""),
+            "balance": float(d.get("balance", 0) or 0),
+            "apr": float(_annual_rate(d.get("apr_schedule", 0), start) or 0),
+            "min_payment": float(rule.get("amount", 0) or 0),
+            "has_promo": isinstance(d.get("apr_schedule"), dict),
+        })
+
+    def streams_of(key):
+        return [{"name": s.get("name", ""), "amount": float(s.get("amount", 0) or 0),
+                 "cadence": s.get("cadence", "monthly")} for s in streams.get(key, [])]
+
+    return {
+        "accounts": accounts,
+        "debts": debts,
+        "income": streams_of("income"),
+        "expenses": streams_of("expenses"),
+        "settings": {
+            "start_date": start.isoformat() if hasattr(start, "isoformat") else str(start),
+            "goal_net_worth": sim.get("goal_net_worth"),
+            "emergency_floor": float(sim.get("emergency_floor", 0) or 0),
+            "cash_account": sim.get("cash_landing_account") or sim.get("cash_account") or "",
+            "months": int(sim.get("months", 120) or 120),
+        },
+    }
+
+
+def form_to_config(form, current_config=None):
+    """Build an engine config from the editable form shape.
+
+    Preserves a debt's promo APR schedule when its effective APR is left
+    unchanged, so editing other fields doesn't silently flatten the promo.
+    """
+    current_config = current_config or {}
+    cur_start = current_config.get("simulation", {}).get("start_date") or date.today()
+    cur_debts = {(d.get("name") or "").strip(): d for d in current_config.get("instruments", {}).get("debts", [])}
+
+    accounts = []
+    for a in form.get("accounts", []):
+        name = (a.get("name") or "").strip()
+        if not name:
+            continue
+        rate = float(a.get("rate") or 0)
+        accounts.append({
+            "name": name,
+            "balance": float(a.get("balance") or 0),
+            "rate_schedule": rate,
+            "annual_return": rate,
+            "type": "invest" if (a.get("type") == "invest") else "cash",
+            "monthly_target": float(a.get("monthly_target") or 0),
+        })
+
+    debts = []
+    for d in form.get("debts", []):
+        name = (d.get("name") or "").strip()
+        if not name:
+            continue
+        apr_val = float(d.get("apr") or 0)
+        apr_schedule = apr_val
+        cur = cur_debts.get(name)
+        if cur and isinstance(cur.get("apr_schedule"), dict):
+            # keep the promo schedule if the user didn't change the effective APR
+            if abs(apr_val - _annual_rate(cur["apr_schedule"], cur_start)) < 1e-9:
+                apr_schedule = cur["apr_schedule"]
+        debts.append({
+            "name": name,
+            "balance": float(d.get("balance") or 0),
+            "apr_schedule": apr_schedule,
+            "min_payment_rule": {"type": "fixed", "amount": float(d.get("min_payment") or 0)},
+        })
+
+    def streams_of(key):
+        out = []
+        for s in form.get(key, []):
+            name = (s.get("name") or "").strip()
+            if not name:
+                continue
+            out.append({"name": name, "amount": float(s.get("amount") or 0),
+                        "cadence": s.get("cadence") or "monthly"})
+        return out
+
+    settings = form.get("settings", {})
+    goal = settings.get("goal_net_worth")
+    if goal in ("", None):
+        goal = None
+    config = build_scenario(
+        accounts=accounts,
+        debts=debts,
+        income=streams_of("income"),
+        expenses=streams_of("expenses"),
+        start_date=settings.get("start_date") or cur_start,
+        months=int(settings.get("months") or 120),
+        cash_account=(settings.get("cash_account") or "").strip() or None,
+        goal_net_worth=goal,
+    )
+    config["simulation"]["emergency_floor"] = float(settings.get("emergency_floor") or 0)
+    return config
+
+
+# ---------------------------------------------------------------------------
 # Session + agentic loop
 # ---------------------------------------------------------------------------
 

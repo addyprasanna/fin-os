@@ -85,6 +85,11 @@ worth, debt-free date, total invested, savings rate, interest paid), and a preci
 what's different between the two scenarios. Both plans are simulated over the same fixed horizon so
 the curves line up.
 
+**Edit your numbers directly.** The **Edit ✎** link on the scenario panel opens a form to add,
+change, or remove accounts, debts, income, expenses, and settings — no chat required. Changes save
+to the active plan and are picked up by the agent on its next reply. Editing a debt's APR leaves its
+promo schedule intact unless you actually change the rate.
+
 The agent uses Claude (`claude-opus-4-8`) via the official `anthropic` SDK. It runs locally;
 your scenario and conversation never leave your machine except as prompts to the Claude API.
 

@@ -1229,6 +1229,36 @@ AGENT_HTML_TEMPLATE = """
         .diff-row .db { color: var(--bcol); font-family: var(--num); }
         .cmp-empty { color: var(--muted); font-size: .88rem; text-align: center; padding: 22px; }
         .cmp-chart { margin-top: 6px; }
+
+        /* Scenario editor */
+        .edit-link { margin-left: auto; background: none; border: none; color: var(--accent-deep); font: inherit;
+                     font-size: .72rem; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; }
+        .edit-link:hover { text-decoration: underline; }
+        .esec { margin-bottom: 18px; }
+        .esec .ehd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .esec h3 { font-family: var(--num); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink); }
+        .add-mini { background: var(--accent-wash); color: var(--accent-deep); border: none; border-radius: 8px;
+                    padding: 5px 11px; font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer; }
+        .add-mini:hover { background: #d9f0e6; }
+        .erow { display: grid; gap: 8px; align-items: center; margin-bottom: 6px; }
+        .erow input, .erow select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px;
+                                     font: inherit; font-size: .85rem; background: var(--canvas); width: 100%; }
+        .erow input:focus, .erow select:focus { outline: none; border-color: var(--accent); background: #fff; }
+        .erow.ehead { color: var(--muted); font-size: .66rem; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+        .erow .rm { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.15rem; line-height: 1; padding: 0; }
+        .erow .rm:hover { color: var(--debt); }
+        .erow-acct { grid-template-columns: 1.5fr 1fr .9fr .95fr 24px; }
+        .erow-debt { grid-template-columns: 1.5fr 1fr .9fr 1fr 24px; }
+        .erow-stream { grid-template-columns: 1.7fr 1fr 1fr 24px; }
+        .eset { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .eset label { display: flex; flex-direction: column; gap: 5px; font-size: .76rem; color: var(--muted); }
+        .eset input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: .88rem; background: var(--canvas); }
+        .mfoot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--line-soft);
+                 position: sticky; bottom: 0; background: #fff; }
+        .btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 11px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+        .btn-primary:hover { background: var(--accent-deep); }
+        .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 11px; padding: 10px 16px; font: inherit; cursor: pointer; }
+        .btn-ghost:hover { background: var(--canvas); }
     </style>
 </head>
 <body>
@@ -1297,7 +1327,7 @@ AGENT_HTML_TEMPLATE = """
                     <canvas id="chart" height="200" style="display:none"></canvas>
                 </div>
                 <div class="scenario">
-                    <h3>Current scenario</h3>
+                    <h3><span>Current scenario</span><button class="edit-link" onclick="openEdit()">Edit ✎</button></h3>
                     <pre id="scenario">loading…</pre>
                 </div>
             </div>
@@ -1320,6 +1350,22 @@ AGENT_HTML_TEMPLATE = """
                     <button onclick="runCompare()">Compare</button>
                 </div>
                 <div id="cmp-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="edit-modal" onclick="if(event.target===this)closeEdit()">
+        <div class="modal">
+            <div class="mhead">
+                <h2>Edit scenario</h2>
+                <button class="icon-btn" onclick="closeEdit()" aria-label="Close">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="mbody" id="edit-body"></div>
+            <div class="mfoot">
+                <button class="btn-ghost" onclick="closeEdit()">Cancel</button>
+                <button class="btn-primary" onclick="saveEdit()">Save changes</button>
             </div>
         </div>
     </div>
@@ -1625,6 +1671,96 @@ AGENT_HTML_TEMPLATE = """
 
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCompare(); });
 
+        // ---- Direct scenario editor ----
+        function escAttr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+        const RM = '<button class="rm" onclick="this.closest(\\'.erow\\').remove()" title="Remove">&times;</button>';
+
+        function acctRow(a) {
+            a = a || {}; const t = a.type === 'invest';
+            return '<div class="erow erow-acct" data-mt="' + (a.monthly_target || 0) + '">' +
+                '<input class="f-name" placeholder="Account" value="' + escAttr(a.name) + '">' +
+                '<input class="f-balance" type="number" step="0.01" value="' + (a.balance || 0) + '">' +
+                '<input class="f-rate" type="number" step="0.001" title="Annual return, e.g. 0.042" value="' + (a.rate || 0) + '">' +
+                '<select class="f-type"><option value="cash"' + (t ? '' : ' selected') + '>Cash</option><option value="invest"' + (t ? ' selected' : '') + '>Invest</option></select>' +
+                RM + '</div>';
+        }
+        function debtRow(d) {
+            d = d || {};
+            return '<div class="erow erow-debt">' +
+                '<input class="f-name" placeholder="Debt' + (d.has_promo ? ' (promo APR kept if unchanged)' : '') + '" value="' + escAttr(d.name) + '">' +
+                '<input class="f-balance" type="number" step="0.01" value="' + (d.balance || 0) + '">' +
+                '<input class="f-apr" type="number" step="0.0001" title="APR, e.g. 0.2249" value="' + (d.apr || 0) + '">' +
+                '<input class="f-min" type="number" step="1" value="' + (d.min_payment || 0) + '">' +
+                RM + '</div>';
+        }
+        function streamRow(s) {
+            s = s || {}; const bi = s.cadence === 'biweekly';
+            return '<div class="erow erow-stream">' +
+                '<input class="f-name" placeholder="Name" value="' + escAttr(s.name) + '">' +
+                '<input class="f-amount" type="number" step="0.01" value="' + (s.amount || 0) + '">' +
+                '<select class="f-cadence"><option value="monthly"' + (bi ? '' : ' selected') + '>Monthly</option><option value="biweekly"' + (bi ? ' selected' : '') + '>Biweekly</option></select>' +
+                RM + '</div>';
+        }
+
+        async function openEdit() {
+            const d = await (await fetch('/api/scenario/config')).json();
+            const st = d.settings || {};
+            document.getElementById('edit-body').innerHTML =
+                section('Accounts', 'acct', '<div class="erow erow-acct ehead"><span>Name</span><span>Balance</span><span>APY</span><span>Type</span><span></span></div>', d.accounts.map(acctRow).join('')) +
+                section('Debts', 'debt', '<div class="erow erow-debt ehead"><span>Name</span><span>Balance</span><span>APR</span><span>Min pay</span><span></span></div>', d.debts.map(debtRow).join('')) +
+                section('Income', 'income', '<div class="erow erow-stream ehead"><span>Name</span><span>Amount</span><span>Cadence</span><span></span></div>', d.income.map(streamRow).join('')) +
+                section('Expenses', 'expense', '<div class="erow erow-stream ehead"><span>Name</span><span>Amount</span><span>Cadence</span><span></span></div>', d.expenses.map(streamRow).join('')) +
+                '<div class="esec"><div class="ehd"><h3>Settings</h3></div><div class="eset">' +
+                    '<label>Start date<input id="s-start" type="date" value="' + escAttr(st.start_date) + '"></label>' +
+                    '<label>Goal net worth ($)<input id="s-goal" type="number" step="1000" value="' + (st.goal_net_worth == null ? '' : st.goal_net_worth) + '"></label>' +
+                    '<label>Emergency floor ($)<input id="s-floor" type="number" step="100" value="' + (st.emergency_floor || 0) + '"></label>' +
+                    '<label>Cash account<input id="s-cash" type="text" value="' + escAttr(st.cash_account) + '"></label>' +
+                    '<label>Max months<input id="s-months" type="number" step="1" value="' + (st.months || 120) + '"></label>' +
+                '</div></div>';
+            document.getElementById('edit-modal').classList.add('open');
+        }
+
+        function section(title, key, head, rows) {
+            return '<div class="esec"><div class="ehd"><h3>' + title + '</h3>' +
+                '<button class="add-mini" onclick="addRow(\\'' + key + '\\')">+ Add</button></div>' +
+                head + '<div id="rows-' + key + '">' + rows + '</div></div>';
+        }
+        function addRow(key) {
+            const fns = { acct: acctRow, debt: debtRow, income: streamRow, expense: streamRow };
+            document.getElementById('rows-' + key).insertAdjacentHTML('beforeend', fns[key]({}));
+        }
+        function closeEdit() { document.getElementById('edit-modal').classList.remove('open'); }
+
+        function collectRows(key, build) {
+            return [...document.getElementById('rows-' + key).querySelectorAll('.erow')].map(build).filter(x => x.name.trim());
+        }
+        function num(el, sel) { return parseFloat(el.querySelector(sel).value) || 0; }
+
+        async function saveEdit() {
+            const payload = {
+                accounts: collectRows('acct', r => ({ name: r.querySelector('.f-name').value, balance: num(r, '.f-balance'),
+                    rate: num(r, '.f-rate'), type: r.querySelector('.f-type').value, monthly_target: parseFloat(r.dataset.mt) || 0 })),
+                debts: collectRows('debt', r => ({ name: r.querySelector('.f-name').value, balance: num(r, '.f-balance'),
+                    apr: num(r, '.f-apr'), min_payment: num(r, '.f-min') })),
+                income: collectRows('income', r => ({ name: r.querySelector('.f-name').value, amount: num(r, '.f-amount'), cadence: r.querySelector('.f-cadence').value })),
+                expenses: collectRows('expense', r => ({ name: r.querySelector('.f-name').value, amount: num(r, '.f-amount'), cadence: r.querySelector('.f-cadence').value })),
+                settings: {
+                    start_date: document.getElementById('s-start').value,
+                    goal_net_worth: document.getElementById('s-goal').value,
+                    emergency_floor: parseFloat(document.getElementById('s-floor').value) || 0,
+                    cash_account: document.getElementById('s-cash').value,
+                    months: parseInt(document.getElementById('s-months').value) || 120,
+                },
+            };
+            const r = await fetch('/api/scenario/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const j = await r.json();
+            if (!r.ok) { alert(j.error || 'Could not save changes.'); return; }
+            document.getElementById('scenario').textContent = j.scenario;
+            closeEdit();
+            resetInsights();
+            loadPlans();
+        }
+
         async function init() {
             await loadPlans();
             await loadScenario();
@@ -1723,6 +1859,24 @@ def create_agent_app(config=None):
     @app.route("/api/messages")
     def messages():
         return jsonify({"messages": store.get_messages(app.config["active_id"])})
+
+    @app.route("/api/scenario/config")
+    def scenario_config():
+        from agent import config_to_form
+        return jsonify(config_to_form(app.config["session"].config))
+
+    @app.route("/api/scenario/config", methods=["POST"])
+    def save_scenario_config():
+        from agent import form_to_config, scenario_text
+        session = app.config["session"]
+        form = request.get_json(silent=True) or {}
+        try:
+            new_config = form_to_config(form, session.config)
+        except (ValueError, TypeError, KeyError) as e:
+            return jsonify({"error": f"Could not apply changes: {e}"}), 400
+        session.config = new_config
+        store.save_config(app.config["active_id"], new_config)
+        return jsonify({"ok": True, "scenario": scenario_text(new_config)})
 
     @app.route("/api/compare")
     def compare_plans():
